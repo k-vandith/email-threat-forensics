@@ -1,0 +1,10 @@
+Return-Path: <attacker@evil.example>
+Received: from mail.evil.example (203.0.113.50) by mx.example.com
+Authentication-Results: mx.example.com; spf=fail smtp.mailfrom=evil.example; dkim=fail; dmarc=fail
+From: "IT Support" <it-support@company.com>
+To: victim@company.com
+Subject: URGENT: Verify your account immediately
+Date: Mon, 1 Apr 2025 10:00:00 +0000
+Content-Type: text/plain
+
+Your password will expire. Click here: http://bit.ly/fake-login
