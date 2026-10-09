@@ -42,13 +42,13 @@ def main() -> None:
         else:
             st.success("No phishing indicators flagged by the local rules.")
         st.markdown("### URLs and IOCs")
-        st.dataframe(pd.DataFrame({"url": analysis.urls or ["—"]}), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame({"url": analysis.urls or ["—"]}), hide_index=True, width="stretch")
         if analysis.iocs:
             st.write(", ".join(analysis.iocs))
     with right:
         st.markdown("### Hops")
         if hops:
-            st.dataframe(pd.DataFrame([{"order": h.order, "ip": h.ip, "geo": h.geo.get("city", ""), "country": h.geo.get("country", "")} for h in hops]), hide_index=True, use_container_width=True)
+            st.dataframe(pd.DataFrame([{"order": h.order, "ip": h.ip, "geo": h.geo.get("city", ""), "country": h.geo.get("country", "")} for h in hops]), hide_index=True, width="stretch")
         st.markdown("### Timeline")
         for line in analysis.timeline or ["No Received timeline parsed."]:
             st.caption(line)
