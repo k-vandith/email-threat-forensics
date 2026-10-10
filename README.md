@@ -1,188 +1,93 @@
-# Email Threat Detection & Forensic Intelligence Platform
+# SignalTrace — Email Threat Forensics
 
-Offline email forensics toolkit for header analysis, SPF/DKIM/DMARC signals, URL extraction, and phishing-risk scoring.
+**A privacy-first email examination desk for local investigation of .eml evidence.** SignalTrace parses message headers, authentication-result claims, routing hops, URLs and domains, then presents its evidence in a purpose-built HTML/CSS/JavaScript workspace.
 
-## Problem Statement
+The browser UI is served by a small Python standard-library HTTP server. Your message is analyzed on your own machine; the app has no external API integrations and does not perform DNS, IP reputation, URL reputation or live geolocation lookups.
 
-Phishing and business-email compromise remain top enterprise threats. Analysts need a local tool to dissect `.eml` messages, score risk, and extract IOCs without uploading mail to third-party services.
+## What it does
 
-## Overview
+- **Examine a message envelope:** subject, sender, recipients, declared date, message ID and origin IP.
+- **Review authentication claims:** interpret SPF, DKIM and DMARC outcomes that are already present in the message headers. These are not independently verified by the app.
+- **Follow the Received trail:** list parsed mail hops in header order and display offline labels only.
+- **Explain local signals:** show the configured heuristic flags and a bounded risk score.
+- **Inventory IOCs:** deduplicate observed IPs, URLs and domains; filter and copy values; export JSON or CSV.
+- **Preserve evidence:** inspect the raw message, browse parsed headers and export a self-contained HTML evidence report.
+- **Stay local:** no account, API key, GPU, external fonts, analytics beacon or network enrichment is needed.
 
-Parse email headers and bodies, evaluate authentication results, extract URLs/domains, and produce a risk score with explainable signals for investigators.
+## Start
 
-## Features
+Python 3.11 or newer is recommended. From a terminal:
 
-- **EML parsing** – headers, body, attachments metadata
-- **Auth signals** – SPF / DKIM / DMARC result interpretation
-- **URL extraction** – linked and obfuscated patterns
-- **Phishing score** – weighted heuristic model
-- **Streamlit UI** – upload and review workflow
-- **Demo samples** – benign and phishing-like fixtures
+    git clone https://github.com/k-vandith/email-threat-forensics.git
+    cd email-threat-forensics
+    python run.py
 
-## Architecture
+Open http://127.0.0.1:8765 if the browser does not open automatically. To use another port:
 
-```
-┌─────────────┐     ┌────────────────┐     ┌─────────────┐
-│  Streamlit  │────▶│ Email Analyzer │────▶│  Scoring    │
-│     UI      │     │                │     │  engine     │
-└─────────────┘     └───────┬────────┘     └─────────────┘
-                            │
-                     ┌──────▼──────┐
-                     │  IOC export │
-                     └─────────────┘
-```
+    python run.py --port 9000
 
-## Tech Stack
+To run without launching a browser:
 
-- Python 3.11+
-- Streamlit
-- Pandas
-- Pydantic
-- pytest
+    python run.py --no-browser
 
-## Repository Structure
+The server binds to 127.0.0.1 by default. Avoid exposing the service on an untrusted network: messages are sensitive and this small local workstation is not an authenticated multi-user service.
 
-```
-email-threat-forensics/
-├── README.md
-├── requirements.txt
-├── src/
-│   └── email_analyzer.py
-├── tests/
-│   └── test_email.py
-├── data/
-├── scripts/
-│   ├── setup_env.py
-│   ├── setup.sh
-│   ├── setup.ps1
-│   └── generate_demo_data.py
-└── docs/
-```
+## Workflow
 
-## System Requirements
+1. Open the bundled training message, or choose **Import .eml** to inspect a local .eml / .txt message.
+2. Read the risk score and the individual signals. The score is an explainable heuristic, not a probability of compromise.
+3. Review authentication claims and the Received-header trail.
+4. Open **Message source** to inspect the original text and parsed headers.
+5. Open **IOC register** to filter the extracted evidence, copy values, or export CSV / JSON.
+6. Export a self-contained HTML report when a shareable summary is needed.
 
-| Mode | CPU | RAM | Disk | GPU |
-|------|-----|-----|------|-----|
-| Demo | Any | 1 GB | 500 MB | Not needed |
+A sample case is restored from data/sample/phishing_sample.eml on demand. Its values are illustrative. The sample uses documentation-only IP space and reserved example domains; it is not evidence of a live incident.
 
-## Installation
+## Heuristic model and limits
 
-### Recommended (all platforms) — automated bootstrap
+Current score weights are deliberately transparent: SPF fail +0.25, DKIM fail +0.20, DMARC fail +0.15, urgent / credential-bait language +0.20, and a recognized URL shortener +0.15, capped at 1.00. A message can still be malicious if none of these rules fire. A low score is not a guarantee of safety.
 
-Handles missing `ensurepip`, symlink restrictions, and installs dependencies into `.venv`:
+- Authentication outcomes are read from headers supplied with the message and may be forged.
+- IP and domain values are extracted heuristically; validity, ownership and reputation are not verified.
+- URL extraction is not a browser, redirect resolver or detonation sandbox. SignalTrace does not open links.
+- The hop labels are offline placeholders, not authoritative geolocation.
+- Attachments are not executed or detonated; no malware verdict is produced.
+- Preserve the original message independently when chain-of-custody or legal requirements apply.
 
-```bash
-git clone https://github.com/k-vandith/email-threat-forensics.git
-cd email-threat-forensics
-python3 scripts/setup_env.py    # or:  python scripts/setup_env.py
-```
+## Privacy and security
 
-Then activate:
+- Input is processed in memory by the local process and is not intentionally written to an upload directory.
+- Requests are capped at 2 MB per message.
+- The browser interface uses a restrictive Content Security Policy, disables automatic external assets and renders message-derived content as text.
+- HTML reports escape message-derived values to prevent them from becoming active markup.
+- Do not commit genuine mailbox exports or production message contents to a public repository.
 
-```bash
-# Linux / macOS
-source .venv/bin/activate
+## Development and tests
 
-# Windows PowerShell
-.venv\Scripts\Activate.ps1
-```
+Runtime code uses the Python standard library. For development checks:
 
-### Manual setup
+    python -m venv .venv
+    # Windows PowerShell: .venv\Scripts\Activate.ps1
+    # macOS / Linux: source .venv/bin/activate
+    python -m pip install -r requirements-dev.txt
+    ruff check src run.py tests
+    bandit -q -r src run.py -ll
+    pip-audit -r requirements.txt --progress-spinner off
+    pytest -q
 
-#### Windows (PowerShell)
+The GitHub Actions workflow runs lint, Bandit, dependency audit and tests for pull requests and pushes to main.
 
-```powershell
-git clone https://github.com/k-vandith/email-threat-forensics.git
-cd email-threat-forensics
-python -m venv .venv --copies
-.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-```
+## Project map
 
-#### Linux / macOS
-
-```bash
-git clone https://github.com/k-vandith/email-threat-forensics.git
-cd email-threat-forensics
-# If venv fails with ensurepip errors:
-#   sudo apt install python3-venv python3-pip
-python3 -m venv .venv --copies
-source .venv/bin/activate
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-### Why `--copies`?
-
-Some environments cannot create symlinks inside a venv (`Operation not permitted` on `lib64 → lib`). Using `--copies` avoids that. `scripts/setup_env.py` tries `--copies` first automatically.
-
-## Environment Variables
-
-None required for demo mode.
-
-## Dataset / Demo Mode
-
-```bash
-python scripts/generate_demo_data.py
-```
-
-Creates sample `.eml` fixtures under `data/`.
-
-## Running the Application
-
-```bash
-streamlit run src/email_analyzer.py
-```
-
-## API Usage
-
-```python
-from src.email_analyzer import analyze_email
-result = analyze_email(open("data/phishing_sample.eml", "rb").read())
-print(result["risk_score"], result["signals"])
-```
-
-## Testing
-
-```bash
-pytest -v
-```
-
-## Troubleshooting
-
-| Issue | Fix |
-|-------|-----|
-| `ModuleNotFoundError: src` | Run from project root; ensure `PYTHONPATH=.` |
-| `venv` / ensurepip fails | Run `python3 scripts/setup_env.py` or install `python3-venv` |
-| `Operation not permitted` on lib64 | Use `python3 -m venv .venv --copies` |
-| Missing dependency | Activate `.venv` and re-run `pip install -r requirements.txt` |
-
-## Limitations
-
-- Heuristic scoring; not a replacement for full secure-email gateways.
-- Attachment content is metadata-only (no sandbox detonation).
-- Live DNS lookups for SPF are optional and disabled in pure offline mode.
-
-## Security / Privacy
-
-- Defensive forensics only.
-- Do not commit real production mailboxes to public repositories.
-
-## Future Improvements
-
-- YARA rules for attachment triage
-- STIX/TAXII IOC export
-- Multi-message campaign correlation
+    src/email_analyzer.py    Header parsing, IOC extraction and heuristic scoring
+    src/email_features.py    Received-hop parsing, offline labels and safe HTML reports
+    src/webapp.py            Local HTTP server and JSON analysis endpoints
+    web/index.html           Accessible workspace layout
+    web/styles.css           Responsive evidence-desk visual system
+    web/app.js               Browser interactions and evidence exports
+    data/sample/             Non-production training fixture
+    tests/                   Parser, report security and UI smoke tests
 
 ## License
 
-MIT
-
-## Interface
-
-```bash
-python run.py
-```
-
-Opens the local Streamlit workspace on port 8501. Demo paths work without GPU, webcam, or a paid API. `streamlit run src/app.py` is equivalent.
+MIT. Defensive email forensics and education.

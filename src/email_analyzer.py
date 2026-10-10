@@ -4,7 +4,6 @@ import re
 from dataclasses import dataclass, field
 from email import message_from_string, policy
 from pathlib import Path
-from typing import Any
 
 @dataclass
 class EmailAnalysis:
@@ -76,10 +75,13 @@ def parse_email(raw: str) -> EmailAnalysis:
     if analysis.dkim == "fail":
         analysis.phishing_indicators.append("DKIM fail")
         score += 0.2
+    if analysis.dmarc == "fail":
+        analysis.phishing_indicators.append("DMARC fail")
+        score += 0.15
     if re.search(r"urgent|verify your account|password.*expire|click here", body + analysis.subject, re.I):
         analysis.phishing_indicators.append("Urgent language / credential bait")
         score += 0.2
-    if any("bit.ly" in u or "tinyurl" in u for u in analysis.urls):
+    if any("bit.ly" in u.lower() or "tinyurl" in u.lower() for u in analysis.urls):
         analysis.phishing_indicators.append("URL shortener")
         score += 0.15
     analysis.threat_score = min(1.0, score)
