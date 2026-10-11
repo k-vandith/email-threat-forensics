@@ -54,11 +54,21 @@ def _extract_urls(text: str) -> list[str]:
     ))
 
 
-def _claim_status(method: str, auth_results: str, received_spf: str = "") -> str:
+def _received_spf_claims(values: list[str]) -> list[str]:
+    """Extract the leading pass/fail result from every Received-SPF header."""
+    claims: list[str] = []
+    for value in values:
+        match = re.match(r"^\s*(pass|fail)\b", value, re.I)
+        if match:
+            claims.append(match.group(1).lower())
+    return claims
+
+
+def _claim_status(method: str, auth_results: str, received_spf: list[str] | None = None) -> str:
     """Interpret explicit header claims conservatively: any explicit fail wins."""
     claims = re.findall(rf"\b{re.escape(method)}\s*=\s*(pass|fail)\b", auth_results, re.I)
     if method.lower() == "spf":
-        claims.extend(re.findall(r"^\s*(pass|fail)\b", received_spf, re.I | re.M))
+        claims.extend(_received_spf_claims(received_spf or []))
     normalized = [claim.lower() for claim in claims]
     if "fail" in normalized:
         return "fail"
@@ -97,7 +107,9 @@ def parse_email(raw: str) -> EmailAnalysis:
     body_parts: list[str] = []
     if msg.is_multipart():
         for part in msg.walk():
-            if part.get_content_disposition() == "attachment":
+            if part.get_content_disposition() == "attachment" or part.get_filename():
+                # Some real-world messages specify a filename without a Content-Disposition
+                # header. Do not treat those attached documents as the message body.
                 continue
             if part.get_content_type() not in {"text/plain", "text/html"}:
                 continue
@@ -117,17 +129,20 @@ def parse_email(raw: str) -> EmailAnalysis:
         except Exception:
             body = str(msg.get_payload())
 
-    full = raw + "\n" + body
+    # Search the decoded message body and top-level headers, not the raw MIME source:
+    # otherwise plain-text attachments can be misreported as the sender's lure.
+    header_text = "\n".join(f"{name}: {value}" for name, value in msg.items())
+    full = header_text + "\n" + body
     analysis.urls = _extract_urls(full)
     analysis.domains = list(dict.fromkeys(DOMAIN_RE.findall(full)))
 
     auth_values = [str(value) for value in (msg.get_all("Authentication-Results", []) or [])]
     auth_results = " ".join(auth_values)
-    received_spf = " ".join(str(value) for value in (msg.get_all("Received-SPF", []) or []))
+    received_spf = [str(value) for value in (msg.get_all("Received-SPF", []) or [])]
     for method in ("spf", "dkim", "dmarc"):
         statuses = re.findall(rf"\b{method}\s*=\s*(pass|fail)\b", auth_results, re.I)
         if method == "spf":
-            statuses.extend(re.findall(r"^\s*(pass|fail)\b", received_spf, re.I | re.M))
+            statuses.extend(_received_spf_claims(received_spf))
         normalized = [value.lower() for value in statuses]
         if "pass" in normalized and "fail" in normalized:
             analysis.anomalies.append(

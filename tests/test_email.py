@@ -90,3 +90,38 @@ def test_to_header_with_comma_inside_display_name_parses_recipients():
     assert len(analysis.recipients) == 2
     assert "jane@example.test" in analysis.recipients[0]
     assert analysis.recipients[1] == "team@example.test"
+
+def test_all_received_spf_headers_contribute_to_status_and_conflict_detection():
+    analysis = parse_email(
+        "From: sender@example.test\n"
+        "Received-SPF: pass (trusted.example: domain of sender@example.test designates 192.0.2.4)\n"
+        "Received-SPF: fail (untrusted.example: domain of sender@example.test does not designate 192.0.2.4)\n"
+        "Subject: Routine message\n\n"
+        "Hello."
+    )
+
+    assert analysis.spf == "fail"
+    assert any("Conflicting SPF" in anomaly for anomaly in analysis.anomalies)
+
+
+def test_multipart_text_attachment_without_disposition_is_not_analyzed_as_body():
+    raw = (
+        "From: sender@example.test\n"
+        "Subject: Routine message\n"
+        "MIME-Version: 1.0\n"
+        'Content-Type: multipart/mixed; boundary="TRACEBOUNDARY"\n\n'
+        "--TRACEBOUNDARY\n"
+        'Content-Type: text/plain; name="notice.txt"\n'
+        "Content-Transfer-Encoding: 7bit\n\n"
+        "URGENT: verify your account at https://attacker.example/attachment\n"
+        "--TRACEBOUNDARY\n"
+        "Content-Type: text/plain; charset=utf-8\n\n"
+        "Ordinary status update.\n"
+        "--TRACEBOUNDARY--\n"
+    )
+
+    analysis = parse_email(raw)
+
+    assert "https://attacker.example/attachment" not in analysis.urls
+    assert "attacker.example" not in analysis.domains
+    assert "Urgent language / credential bait" not in analysis.phishing_indicators
