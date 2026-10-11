@@ -1,6 +1,7 @@
 """Defensive email forensics: headers, phishing signals, auth interpretation, IOCs."""
 from __future__ import annotations
 
+import ipaddress
 import re
 from dataclasses import dataclass, field
 from email import message_from_string, policy
@@ -77,6 +78,18 @@ def _claim_status(method: str, auth_results: str, received_spf: list[str] | None
     return "unknown"
 
 
+def _valid_ip_matches(text: str) -> list[str]:
+    """Return syntactically valid IPv4 candidates from untrusted message text."""
+    valid: list[str] = []
+    for value in IP_RE.findall(text):
+        try:
+            ipaddress.ip_address(value)
+        except ValueError:
+            continue
+        valid.append(value)
+    return valid
+
+
 def _has_shortener_host(url: str) -> bool:
     try:
         hostname = (urlsplit(url).hostname or "").lower().rstrip(".")
@@ -99,9 +112,12 @@ def parse_email(raw: str) -> EmailAnalysis:
 
     received = msg.get_all("Received", []) or []
     for header in reversed(received):
-        ips = IP_RE.findall(str(header))
+        ips = _valid_ip_matches(str(header))
         if ips:
             analysis.originating_ip = ips[0]
+            analysis.anomalies.append(
+                "Candidate originating IP comes from an untrusted Received header; verify it against trusted mail gateway logs."
+            )
             break
 
     body_parts: list[str] = []
@@ -171,7 +187,7 @@ def parse_email(raw: str) -> EmailAnalysis:
         score += 0.15
     analysis.threat_score = min(1.0, score)
 
-    all_ips = list(dict.fromkeys(IP_RE.findall(full)))
+    all_ips = list(dict.fromkeys(_valid_ip_matches(full)))
     analysis.iocs = list(dict.fromkeys(
         ([analysis.originating_ip] if analysis.originating_ip else [])
         + all_ips
