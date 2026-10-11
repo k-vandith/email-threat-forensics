@@ -1,5 +1,8 @@
 from pathlib import Path
-from src.email_analyzer import analyze_eml_file
+import base64
+
+from src.email_analyzer import analyze_eml_file, parse_email
+
 
 def test_phishing_sample():
     p = Path(__file__).resolve().parents[1] / "data" / "sample" / "phishing_sample.eml"
@@ -10,3 +13,80 @@ def test_phishing_sample():
     assert a.threat_score > 0.3
     assert a.spf == "fail"
     assert any("bit.ly" in u for u in a.urls)
+
+
+def test_standard_received_spf_header_failure_is_detected():
+    analysis = parse_email(
+        "From: sender@example.test\n"
+        "Received-SPF: fail (example.test does not designate 203.0.113.8)\n"
+        "Subject: Update\n\n"
+        "Please review."
+    )
+
+    assert analysis.spf == "fail"
+    assert "SPF fail" in analysis.phishing_indicators
+
+
+def test_conflicting_authentication_claims_never_resolve_to_pass():
+    analysis = parse_email(
+        "From: sender@example.test\n"
+        "Authentication-Results: first.example; spf=pass; dkim=pass; dmarc=pass\n"
+        "Authentication-Results: second.example; spf=fail; dkim=fail; dmarc=fail\n\n"
+        "Hello."
+    )
+
+    assert analysis.spf == analysis.dkim == analysis.dmarc == "fail"
+    assert len(analysis.anomalies) == 3
+
+
+def test_extracts_bare_body_domains_all_ip_values_and_cleans_url_punctuation():
+    analysis = parse_email(
+        "From: Sender <sender@legit.example>\n"
+        "Received: from mx (198.51.100.2)\n"
+        "Subject: Link\n\n"
+        "Visit https://example.test/login).\n"
+        "Also check portal.attacker.example and 203.0.113.77.\n"
+        "Not shorteners: https://mybit.ly.example/path and https://not-bit.ly.attacker.test/path"
+    )
+
+    assert "https://example.test/login" in analysis.urls
+    assert "https://example.test/login)." not in analysis.urls
+    assert "portal.attacker.example" in analysis.domains
+    assert "198.51.100.2" in analysis.iocs
+    assert "203.0.113.77" in analysis.iocs
+    assert "portal.attacker.example" in analysis.iocs
+    assert "URL shortener" not in analysis.phishing_indicators
+
+
+def test_html_only_multipart_body_is_decoded_for_url_and_lure_detection():
+    html_body = '<html><body>Verify your account <a href="https://bit.ly/login">continue</a></body></html>'
+    encoded = base64.b64encode(html_body.encode("utf-8")).decode("ascii")
+    raw = (
+        "From: sender@example.test\n"
+        "Subject: Review required\n"
+        "MIME-Version: 1.0\n"
+        'Content-Type: multipart/alternative; boundary="TRACEBOUNDARY"\n\n'
+        "--TRACEBOUNDARY\n"
+        "Content-Type: text/html; charset=utf-8\n"
+        "Content-Transfer-Encoding: base64\n\n"
+        + encoded
+        + "\n--TRACEBOUNDARY--\n"
+    )
+
+    analysis = parse_email(raw)
+
+    assert "https://bit.ly/login" in analysis.urls
+    assert "Urgent language / credential bait" in analysis.phishing_indicators
+    assert "URL shortener" in analysis.phishing_indicators
+
+
+def test_to_header_with_comma_inside_display_name_parses_recipients():
+    analysis = parse_email(
+        'From: sender@example.test\n'
+        'To: "Doe, Jane" <jane@example.test>, team@example.test\n'
+        'Subject: Test\n\nHi'
+    )
+
+    assert len(analysis.recipients) == 2
+    assert "jane@example.test" in analysis.recipients[0]
+    assert analysis.recipients[1] == "team@example.test"
