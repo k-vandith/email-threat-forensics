@@ -14,8 +14,10 @@ def test_hops():
     assert isinstance(trace_hops(SAMPLE), list)
 
 
-def test_geo():
-    assert offline_geoip("8.8.8.8")["country"] == "US"
+def test_public_ip_geo_is_unknown_without_a_verified_offline_database():
+    assert offline_geoip("8.8.8.8")["country"] == "UNKNOWN"
+    assert offline_geoip("1.1.1.1")["city"] == "UNKNOWN"
+    assert offline_geoip("10.0.0.1")["country"] == "PRIVATE"
 
 
 def test_report():
