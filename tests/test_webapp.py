@@ -56,3 +56,13 @@ def test_launcher_refuses_non_loopback_binding_without_authentication():
     with pytest.raises(SystemExit) as error:
         main(["--host", "0.0.0.0", "--no-browser"])
     assert error.value.code == 2
+
+
+
+def test_email_ui_does_not_auto-analyze_bundled_phishing_sample():
+    script = (ROOT / "web" / "app.js").read_text(encoding="utf-8")
+    init = script[script.rfind("byId(\"ioc-search\").addEventListener"):]
+
+    assert "loadSample();" not in init
+    assert 'byId("sample-button").addEventListener("click", loadSample)' in init
+    assert "No message has been analyzed yet" in init
