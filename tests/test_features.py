@@ -45,11 +45,10 @@ def test_private_ipv4_range_checks_the_rfc1918_boundaries():
     assert offline_geoip("172.999.0.1")["country"] == "UNKNOWN"
 
 
-def test_geojson_omits_unknown_placeholder_coordinates():
-    known = Hop(order=0, raw="known", ip="8.8.8.8", geo=offline_geoip("8.8.8.8"))
-    unknown = Hop(order=1, raw="unknown", ip="203.0.113.10", geo=offline_geoip("203.0.113.10"))
+def test_geojson_omits_public_ips_without_verified_coordinates():
+    public = Hop(order=0, raw="public", ip="8.8.8.8", geo=offline_geoip("8.8.8.8"))
+    documentation = Hop(order=1, raw="documentation", ip="203.0.113.10", geo=offline_geoip("203.0.113.10"))
 
-    result = hops_geojson_points([known, unknown])
+    result = hops_geojson_points([public, documentation])
 
-    assert len(result["features"]) == 1
-    assert result["features"][0]["properties"]["ip"] == "8.8.8.8"
+    assert result["features"] == []
