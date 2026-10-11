@@ -16,6 +16,7 @@ class EmailAnalysis:
     sender: str = ""
     recipients: list[str] = field(default_factory=list)
     originating_ip: str | None = None
+    originating_ip_trust: str = "unverified"
     domains: list[str] = field(default_factory=list)
     urls: list[str] = field(default_factory=list)
     spf: str = "unknown"
@@ -115,9 +116,7 @@ def parse_email(raw: str) -> EmailAnalysis:
         ips = _valid_ip_matches(str(header))
         if ips:
             analysis.originating_ip = ips[0]
-            analysis.anomalies.append(
-                "Candidate originating IP comes from an untrusted Received header; verify it against trusted mail gateway logs."
-            )
+            analysis.originating_ip_trust = "untrusted_received_header_claim"
             break
 
     body_parts: list[str] = []
