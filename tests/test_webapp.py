@@ -59,7 +59,7 @@ def test_launcher_refuses_non_loopback_binding_without_authentication():
 
 
 
-def test_email_ui_does_not_auto-analyze_bundled_phishing_sample():
+def test_email_ui_does_not_auto_analyze_bundled_phishing_sample():
     script = (ROOT / "web" / "app.js").read_text(encoding="utf-8")
     init = script[script.rfind("byId(\"ioc-search\").addEventListener"):]
 
