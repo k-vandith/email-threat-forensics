@@ -78,3 +78,16 @@ def test_authentication_header_claims_are_explicitly_unverified_in_api_response(
 
     assert result["authentication_claims_verified"] is False
     assert "unverified supplied-header claims" in result["authentication_claims_note"]
+
+
+
+def test_originating_ip_is_marked_unverified_in_api_response():
+    result = analyze_message(
+        "From: sender@example.test\n"
+        "Received: from relay.example (198.51.100.42)\n\n"
+        "Routine message."
+    )
+
+    assert result["originating_ip"] == "198.51.100.42"
+    assert result["originating_ip_verified"] is False
+    assert "untrusted Received headers" in result["originating_ip_note"]
