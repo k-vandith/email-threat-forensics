@@ -35,7 +35,7 @@ def _offline_geo_for_ip(ip: str) -> dict[str, str]:
         return {"country": "PRIVATE", "city": "RFC1918", "org": "local"}
     return {"country": "UNKNOWN", "city": "UNKNOWN", "org": "offline_db"}
 
-_OFFLINE_GEO = {"8.8.8.8": {"country": "US", "city": "Mountain View", "org": "Google"}, "1.1.1.1": {"country": "AU", "city": "Sydney", "org": "Cloudflare"}, "10.0.0.1": {"country": "PRIVATE", "city": "RFC1918", "org": "local"}}
+_OFFLINE_GEO = {"10.0.0.1": {"country": "PRIVATE", "city": "RFC1918", "org": "local"}}
 
 @dataclass
 class Hop:
