@@ -119,14 +119,12 @@ flowchart TD
 
 | Signal | Score contribution |
 |---|---:|
-| SPF failure claim | +0.25 |
-| DKIM failure claim | +0.20 |
-| DMARC failure claim | +0.15 |
+| Unverified SPF/DKIM/DMARC header claims | Displayed for review; **0** numeric weight |
 | Urgent or credential-bait language | +0.20 |
 | Recognised URL shortener (bit.ly / tinyurl) | +0.15 |
-| Maximum score | 1.00 |
+| Maximum with current scoring rules | 0.35 |
 
-Weights are rule-based and deliberately simple. A message can be malicious when none of the rules match; conversely, a match may have a legitimate explanation. Review the evidence and surrounding context before acting.
+Raw message headers do not establish which trusted mail server generated authentication claims. SignalTrace records those claims and marks them unverified, but does not let a forged SPF/DKIM/DMARC header alone inflate the numeric score. The current score is only a small set of heuristic cues, not a calibrated probability or verdict; verify the email using trusted gateway logs and approved security tooling.
 
 ## Privacy and security
 
