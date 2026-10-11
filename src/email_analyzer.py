@@ -174,15 +174,15 @@ def parse_email(raw: str) -> EmailAnalysis:
     analysis.dmarc = _claim_status("dmarc", auth_results)
 
     score = 0.0
+    # Raw EML files do not prove which mail server inserted these headers.
+    # Preserve the claims for analyst review, but never let unauthenticated
+    # authentication headers determine the numeric triage score.
     if analysis.spf == "fail":
-        analysis.phishing_indicators.append("SPF fail")
-        score += 0.25
+        analysis.phishing_indicators.append("SPF fail (unverified header claim)")
     if analysis.dkim == "fail":
-        analysis.phishing_indicators.append("DKIM fail")
-        score += 0.2
+        analysis.phishing_indicators.append("DKIM fail (unverified header claim)")
     if analysis.dmarc == "fail":
-        analysis.phishing_indicators.append("DMARC fail")
-        score += 0.15
+        analysis.phishing_indicators.append("DMARC fail (unverified header claim)")
     if re.search(r"urgent|verify your account|password.*expire|click here", body + analysis.subject, re.I):
         analysis.phishing_indicators.append("Urgent language / credential bait")
         score += 0.2
