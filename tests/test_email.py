@@ -125,3 +125,28 @@ def test_multipart_text_attachment_without_disposition_is_not_analyzed_as_body()
     assert "https://attacker.example/attachment" not in analysis.urls
     assert "attacker.example" not in analysis.domains
     assert "Urgent language / credential bait" not in analysis.phishing_indicators
+
+
+
+def test_invalid_ipv4_in_received_header_is_not_reported_as_originating_ip():
+    analysis = parse_email(
+        "From: sender@example.test\n"
+        "Received: from untrusted.example (999.999.999.999)\n"
+        "Subject: Header validation\n\n"
+        "Ordinary message."
+    )
+
+    assert analysis.originating_ip is None
+    assert "999.999.999.999" not in analysis.iocs
+
+
+def test_originating_ip_is_marked_as_an_untrusted_header_claim():
+    analysis = parse_email(
+        "From: sender@example.test\n"
+        "Received: from relay.example (198.51.100.42)\n"
+        "Subject: Header validation\n\n"
+        "Ordinary message."
+    )
+
+    assert analysis.originating_ip == "198.51.100.42"
+    assert any("untrusted Received header" in item for item in analysis.anomalies)
