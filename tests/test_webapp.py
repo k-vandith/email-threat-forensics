@@ -3,7 +3,7 @@ import pytest
 
 from src.email_features import export_html_report, trace_hops
 from src.email_analyzer import parse_email
-from src.webapp import MAX_MESSAGE_BYTES, analyze_message
+from src.webapp import MAX_MESSAGE_BYTES, analyze_message, main
 
 ROOT = Path(__file__).resolve().parents[1]
 SAMPLE = ROOT / "data" / "sample" / "phishing_sample.eml"
@@ -49,3 +49,10 @@ def test_ui_files_are_present_and_no_remote_frontend_assets():
     assert 'id="view-indicators"' in html
     assert "/api/analyze" in js
     assert "https://" not in html.lower()
+
+
+
+def test_launcher_refuses_non_loopback_binding_without_authentication():
+    with pytest.raises(SystemExit) as error:
+        main(["--host", "0.0.0.0", "--no-browser"])
+    assert error.value.code == 2

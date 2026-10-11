@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import logging
 from dataclasses import asdict
@@ -176,6 +177,15 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     if not 1 <= args.port <= 65535:
         parser.error("--port must be between 1 and 65535")
+    try:
+        loopback = args.host.lower() == "localhost" or ipaddress.ip_address(args.host).is_loopback
+    except ValueError:
+        loopback = False
+    if not loopback:
+        parser.error(
+            "SignalTrace has no authentication layer and must bind to loopback. "
+            "For remote access, use a same-host authenticated HTTPS reverse proxy."
+        )
     server = ThreadingHTTPServer((args.host, args.port), SignalTraceHandler)
     url = "http://%s:%d" % (args.host, args.port)
     print("SignalTrace is ready at " + url)
