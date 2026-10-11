@@ -54,6 +54,8 @@ def analyze_message(raw: str, filename: str = "message.eml") -> dict[str, Any]:
         "reply_to": str(message.get("Reply-To", "")),
         "message_id": str(message.get("Message-ID", "")),
         "originating_ip": analysis.originating_ip,
+        "originating_ip_verified": False,
+        "originating_ip_note": "Candidate extracted from untrusted Received headers; verify against trusted mail gateway logs.",
         "domains": analysis.domains,
         "urls": analysis.urls,
         "headers": headers,
