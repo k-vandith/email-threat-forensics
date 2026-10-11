@@ -12,9 +12,9 @@ SAMPLE = ROOT / "data" / "sample" / "phishing_sample.eml"
 def test_sample_analysis_exposes_casework_fields():
     result = analyze_message(SAMPLE.read_text(encoding="utf-8"), "../../case.eml")
     assert result["filename"] == "case.eml"
-    assert result["risk_band"] == "critical"
+    assert result["risk_band"] == "guarded"
     assert result["spf"] == result["dkim"] == result["dmarc"] == "fail"
-    assert result["threat_score"] >= 0.8
+    assert result["threat_score"] >= 0.3
     assert result["hops"]
     assert any(value.startswith("http://") for value in result["urls"])
     assert "network_lookups" not in result
@@ -56,3 +56,38 @@ def test_launcher_refuses_non_loopback_binding_without_authentication():
     with pytest.raises(SystemExit) as error:
         main(["--host", "0.0.0.0", "--no-browser"])
     assert error.value.code == 2
+
+
+
+def test_email_ui_does_not_auto_analyze_bundled_phishing_sample():
+    script = (ROOT / "web" / "app.js").read_text(encoding="utf-8")
+    init = script[script.rfind("byId(\"ioc-search\").addEventListener"):]
+
+    assert "loadSample();" not in init
+    assert 'byId("sample-button").addEventListener("click", loadSample)' in script
+    assert "No message has been analyzed yet" in init
+
+
+
+def test_authentication_header_claims_are_explicitly_unverified_in_api_response():
+    result = analyze_message(
+        "From: sender@example.test\n"
+        "Authentication-Results: example.test; spf=pass; dkim=pass; dmarc=pass\n\n"
+        "Routine message."
+    )
+
+    assert result["authentication_claims_verified"] is False
+    assert "unverified supplied-header claims" in result["authentication_claims_note"]
+
+
+
+def test_originating_ip_is_marked_unverified_in_api_response():
+    result = analyze_message(
+        "From: sender@example.test\n"
+        "Received: from relay.example (198.51.100.42)\n\n"
+        "Routine message."
+    )
+
+    assert result["originating_ip"] == "198.51.100.42"
+    assert result["originating_ip_verified"] is False
+    assert "untrusted Received headers" in result["originating_ip_note"]

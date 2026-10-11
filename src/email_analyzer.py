@@ -1,6 +1,7 @@
 """Defensive email forensics: headers, phishing signals, auth interpretation, IOCs."""
 from __future__ import annotations
 
+import ipaddress
 import re
 from dataclasses import dataclass, field
 from email import message_from_string, policy
@@ -15,6 +16,7 @@ class EmailAnalysis:
     sender: str = ""
     recipients: list[str] = field(default_factory=list)
     originating_ip: str | None = None
+    originating_ip_trust: str = "unverified"
     domains: list[str] = field(default_factory=list)
     urls: list[str] = field(default_factory=list)
     spf: str = "unknown"
@@ -77,6 +79,18 @@ def _claim_status(method: str, auth_results: str, received_spf: list[str] | None
     return "unknown"
 
 
+def _valid_ip_matches(text: str) -> list[str]:
+    """Return syntactically valid IPv4 candidates from untrusted message text."""
+    valid: list[str] = []
+    for value in IP_RE.findall(text):
+        try:
+            ipaddress.ip_address(value)
+        except ValueError:
+            continue
+        valid.append(value)
+    return valid
+
+
 def _has_shortener_host(url: str) -> bool:
     try:
         hostname = (urlsplit(url).hostname or "").lower().rstrip(".")
@@ -99,9 +113,10 @@ def parse_email(raw: str) -> EmailAnalysis:
 
     received = msg.get_all("Received", []) or []
     for header in reversed(received):
-        ips = IP_RE.findall(str(header))
+        ips = _valid_ip_matches(str(header))
         if ips:
             analysis.originating_ip = ips[0]
+            analysis.originating_ip_trust = "untrusted_received_header_claim"
             break
 
     body_parts: list[str] = []
@@ -139,6 +154,10 @@ def parse_email(raw: str) -> EmailAnalysis:
     auth_values = [str(value) for value in (msg.get_all("Authentication-Results", []) or [])]
     auth_results = " ".join(auth_values)
     received_spf = [str(value) for value in (msg.get_all("Received-SPF", []) or [])]
+    if auth_values or received_spf:
+        analysis.anomalies.append(
+            "Email authentication headers are unverified claims until their trusted receiving-server boundary is confirmed."
+        )
     for method in ("spf", "dkim", "dmarc"):
         statuses = re.findall(rf"\b{method}\s*=\s*(pass|fail)\b", auth_results, re.I)
         if method == "spf":
@@ -154,15 +173,15 @@ def parse_email(raw: str) -> EmailAnalysis:
     analysis.dmarc = _claim_status("dmarc", auth_results)
 
     score = 0.0
+    # Raw EML files do not prove which mail server inserted these headers.
+    # Preserve the claims for analyst review, but never let unauthenticated
+    # authentication headers determine the numeric triage score.
     if analysis.spf == "fail":
-        analysis.phishing_indicators.append("SPF fail")
-        score += 0.25
+        analysis.phishing_indicators.append("SPF fail (unverified header claim)")
     if analysis.dkim == "fail":
-        analysis.phishing_indicators.append("DKIM fail")
-        score += 0.2
+        analysis.phishing_indicators.append("DKIM fail (unverified header claim)")
     if analysis.dmarc == "fail":
-        analysis.phishing_indicators.append("DMARC fail")
-        score += 0.15
+        analysis.phishing_indicators.append("DMARC fail (unverified header claim)")
     if re.search(r"urgent|verify your account|password.*expire|click here", body + analysis.subject, re.I):
         analysis.phishing_indicators.append("Urgent language / credential bait")
         score += 0.2
@@ -171,7 +190,7 @@ def parse_email(raw: str) -> EmailAnalysis:
         score += 0.15
     analysis.threat_score = min(1.0, score)
 
-    all_ips = list(dict.fromkeys(IP_RE.findall(full)))
+    all_ips = list(dict.fromkeys(_valid_ip_matches(full)))
     analysis.iocs = list(dict.fromkeys(
         ([analysis.originating_ip] if analysis.originating_ip else [])
         + all_ips

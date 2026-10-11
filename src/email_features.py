@@ -35,7 +35,7 @@ def _offline_geo_for_ip(ip: str) -> dict[str, str]:
         return {"country": "PRIVATE", "city": "RFC1918", "org": "local"}
     return {"country": "UNKNOWN", "city": "UNKNOWN", "org": "offline_db"}
 
-_OFFLINE_GEO = {"8.8.8.8": {"country": "US", "city": "Mountain View", "org": "Google"}, "1.1.1.1": {"country": "AU", "city": "Sydney", "org": "Cloudflare"}, "10.0.0.1": {"country": "PRIVATE", "city": "RFC1918", "org": "local"}}
+_OFFLINE_GEO = {"10.0.0.1": {"country": "PRIVATE", "city": "RFC1918", "org": "local"}}
 
 @dataclass
 class Hop:
@@ -50,7 +50,13 @@ def trace_hops(raw: str) -> list[Hop]:
     hops = []
     # Received fields are prepended by relays; reverse them to show oldest-to-newest route order.
     for i, header in enumerate(reversed(received)):
-        ips = IP_RE.findall(header)
+        ips = []
+        for candidate in IP_RE.findall(str(header)):
+            try:
+                ipaddress.IPv4Address(candidate)
+            except ipaddress.AddressValueError:
+                continue
+            ips.append(candidate)
         ip = ips[0] if ips else None
         geo = _offline_geo_for_ip(ip) if ip else {}
         hops.append(Hop(order=i, raw=str(header)[:300], ip=ip, geo=geo))
