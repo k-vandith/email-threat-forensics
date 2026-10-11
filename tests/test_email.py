@@ -150,7 +150,8 @@ def test_originating_ip_is_marked_as_an_untrusted_header_claim():
     )
 
     assert analysis.originating_ip == "198.51.100.42"
-    assert any("untrusted Received header" in item for item in analysis.anomalies)
+    assert analysis.originating_ip_trust == "untrusted_received_header_claim"
+    assert not any("originating IP" in item for item in analysis.anomalies)
 
 
 
@@ -193,3 +194,17 @@ def test_untrusted_authentication_failure_headers_do_not_raise_numeric_score():
     assert analysis.threat_score == 0.0
     assert any("unverified header claim" in signal for signal in analysis.phishing_indicators)
     assert any("unverified claims" in item for item in analysis.anomalies)
+
+
+
+def test_unverified_received_ip_provenance_is_not_counted_as_anomaly():
+    analysis = parse_email(
+        "From: sender@example.test\n"
+        "Received: from relay.example (198.51.100.42)\n"
+        "Subject: Routine status\n\n"
+        "Hello."
+    )
+
+    assert analysis.originating_ip == "198.51.100.42"
+    assert analysis.originating_ip_trust == "untrusted_received_header_claim"
+    assert analysis.anomalies == []
