@@ -24,7 +24,7 @@ def test_standard_received_spf_header_failure_is_detected():
     )
 
     assert analysis.spf == "fail"
-    assert "SPF fail" in analysis.phishing_indicators
+    assert any(signal.startswith("SPF fail") for signal in analysis.phishing_indicators)
 
 
 def test_conflicting_authentication_claims_never_resolve_to_pass():
