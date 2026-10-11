@@ -66,3 +66,15 @@ def test_email_ui_does_not_auto_analyze_bundled_phishing_sample():
     assert "loadSample();" not in init
     assert 'byId("sample-button").addEventListener("click", loadSample)' in script
     assert "No message has been analyzed yet" in init
+
+
+
+def test_authentication_header_claims_are_explicitly_unverified_in_api_response():
+    result = analyze_message(
+        "From: sender@example.test\n"
+        "Authentication-Results: example.test; spf=pass; dkim=pass; dmarc=pass\n\n"
+        "Routine message."
+    )
+
+    assert result["authentication_claims_verified"] is False
+    assert "unverified supplied-header claims" in result["authentication_claims_note"]
