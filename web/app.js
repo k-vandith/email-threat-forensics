@@ -380,5 +380,9 @@
   byId("export-json").addEventListener("click", exportIocJson);
   byId("export-csv").addEventListener("click", exportIocCsv);
   byId("ioc-search").addEventListener("input", renderIndicators);
-  loadSample();
+  byId("side-filename").textContent = "No message selected";
+  byId("workspace").hidden = true;
+  byId("report-button").disabled = true;
+  showNotice("Import an .eml file or select Restore sample case to begin. No message has been analyzed yet.");
+  setBusy(false);
 }());
