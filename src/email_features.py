@@ -48,7 +48,8 @@ def trace_hops(raw: str) -> list[Hop]:
     msg = message_from_string(raw, policy=policy.default)
     received = msg.get_all("Received", []) or []
     hops = []
-    # Received fields are prepended by relays; reverse them to show oldest-to-newest route order.\n    for i, header in enumerate(reversed(received)):
+    # Received fields are prepended by relays; reverse them to show oldest-to-newest route order.
+    for i, header in enumerate(reversed(received)):
         ips = IP_RE.findall(header)
         ip = ips[0] if ips else None
         geo = _offline_geo_for_ip(ip) if ip else {}
