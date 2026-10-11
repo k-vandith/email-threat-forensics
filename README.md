@@ -188,6 +188,12 @@ tests/
   test_ui_smoke.py       Entry-point and browser-asset smoke tests
 ~~~
 
+## Production deployment safety
+
+SignalTrace handles sensitive message contents and evidence reports. The launcher now rejects non-loopback bind addresses because the application does not implement user authentication. Keep the process bound to `127.0.0.1`. For remote operator access, terminate HTTPS and enforce authentication at a reverse proxy on the same host; do not expose this HTTP server directly to the internet.
+
+The tool performs heuristic triage and does not independently establish maliciousness. Before operational use, validate detections against a representative, approved email corpus, establish evidence-retention and access policies, and review false-positive/false-negative rates.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
