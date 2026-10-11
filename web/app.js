@@ -207,7 +207,7 @@
       content.appendChild(element("strong", "", hop.ip || "Relay without an extracted IP"));
       content.appendChild(element("p", "", hop.raw || "Received header detected."));
       var geography = hop.geo && hop.geo.country ? "OFFLINE LABEL · " + hop.geo.country : "HEADER EVIDENCE";
-      content.appendChild(element("span", "route-tag", geography));
+      content.appendChild(element("span", "route-tag", geography + " · HEADER CLAIM ONLY"));
       row.appendChild(content);
       root.appendChild(row);
     });
@@ -302,6 +302,7 @@
     byId("message-recipient").textContent = (result.recipients || []).join(", ") || "Not present";
     byId("message-date").textContent = result.date || "Not present";
     byId("message-origin").textContent = result.originating_ip || "Not identified";
+    byId("message-origin").setAttribute("title", result.originating_ip_note || "Candidate from untrusted mail headers");
     byId("analyst-note").textContent = score >= 0.5 ? "Treat this score as triage guidance—not a verdict. Do not follow embedded links. Verify sender identity, expected context and the full authentication chain independently." : "Treat this score as triage guidance—not a verdict. Verify sender identity and the full authentication chain before acting.";
     renderAuth();
     renderSignals();
