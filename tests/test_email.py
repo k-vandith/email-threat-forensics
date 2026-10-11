@@ -150,3 +150,18 @@ def test_originating_ip_is_marked_as_an_untrusted_header_claim():
 
     assert analysis.originating_ip == "198.51.100.42"
     assert any("untrusted Received header" in item for item in analysis.anomalies)
+
+
+
+def test_hop_timeline_does_not_assign_geolocation_to_invalid_ip_text():
+    from src.email_features import trace_hops
+
+    hops = trace_hops(
+        "From: sender@example.test\n"
+        "Received: from untrusted.example (999.999.999.999)\n\n"
+        "Hello"
+    )
+
+    assert len(hops) == 1
+    assert hops[0].ip is None
+    assert hops[0].geo == {}
