@@ -144,9 +144,9 @@
     var grid = byId("auth-grid");
     grid.replaceChildren();
     var items = [
-      { label: "SPF", value: result.spf, detail: "Sender policy framework" },
-      { label: "DKIM", value: result.dkim, detail: "Message signature result" },
-      { label: "DMARC", value: result.dmarc, detail: "Domain alignment policy" }
+      { label: "SPF", value: result.spf, detail: "Unverified header claim only; receiving-server trust boundary is unknown" },
+      { label: "DKIM", value: result.dkim, detail: "Unverified header claim only; signature was not independently validated" },
+      { label: "DMARC", value: result.dmarc, detail: "Unverified header claim only; alignment was not independently validated" }
     ];
     var failures = 0;
     items.forEach(function (item) {
@@ -160,9 +160,9 @@
       grid.appendChild(card);
     });
     byId("auth-failures").replaceChildren(document.createTextNode(pad(failures) + " "));
-    byId("auth-failures").appendChild(element("small", "", "failed"));
-    byId("auth-foot").textContent = failures ? items.filter(function (item) { return item.value === "fail"; }).map(function (item) { return item.label; }).join(" · ") : "No explicit failures observed";
-    byId("auth-summary").textContent = failures ? failures + " authentication failure" + (failures === 1 ? "" : "s") : "No explicit authentication failures";
+    byId("auth-failures").appendChild(element("small", "", "failed claims"));
+    byId("auth-foot").textContent = failures ? items.filter(function (item) { return item.value === "fail"; }).map(function (item) { return item.label; }).join(" · ") : "Supplied headers are claims only; no independent authentication check performed";
+    byId("auth-summary").textContent = failures ? failures + " unverified authentication failure claim" + (failures === 1 ? "" : "s") : "No failure claim present in the supplied headers; authentication is still unverified";
   }
   function renderSignals() {
     var root = byId("signals-list");
