@@ -1,6 +1,7 @@
 """Email forensics extras: hop tracing, offline GeoIP, mbox and safe HTML reports."""
 from __future__ import annotations
 import html
+import ipaddress
 import mailbox
 import re
 from dataclasses import dataclass, field
@@ -10,6 +11,30 @@ from typing import Any
 from src.email_analyzer import parse_email, EmailAnalysis
 
 IP_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
+
+_PRIVATE_NETWORKS = (
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+)
+
+
+def _is_private_ipv4(value: str) -> bool:
+    try:
+        address = ipaddress.IPv4Address(value)
+    except ipaddress.AddressValueError:
+        return False
+    return any(address in network for network in _PRIVATE_NETWORKS)
+
+
+def _offline_geo_for_ip(ip: str) -> dict[str, str]:
+    known = _OFFLINE_GEO.get(ip)
+    if known:
+        return dict(known)
+    if _is_private_ipv4(ip):
+        return {"country": "PRIVATE", "city": "RFC1918", "org": "local"}
+    return {"country": "UNKNOWN", "city": "UNKNOWN", "org": "offline_db"}
+
 _OFFLINE_GEO = {"8.8.8.8": {"country": "US", "city": "Mountain View", "org": "Google"}, "1.1.1.1": {"country": "AU", "city": "Sydney", "org": "Cloudflare"}, "10.0.0.1": {"country": "PRIVATE", "city": "RFC1918", "org": "local"}}
 
 @dataclass
@@ -23,21 +48,16 @@ def trace_hops(raw: str) -> list[Hop]:
     msg = message_from_string(raw, policy=policy.default)
     received = msg.get_all("Received", []) or []
     hops = []
-    for i, header in enumerate(received):
+    # Received fields are prepended by relays; reverse them to show oldest-to-newest route order.
+    for i, header in enumerate(reversed(received)):
         ips = IP_RE.findall(header)
         ip = ips[0] if ips else None
-        geo = dict(_OFFLINE_GEO.get(ip or "", {}))
-        if ip and not geo:
-            geo = {"country": "PRIVATE", "city": "RFC1918", "org": "local"} if ip.startswith(("10.", "192.168.", "172.")) else {"country": "UNKNOWN", "city": "UNKNOWN", "org": "offline_db"}
+        geo = _offline_geo_for_ip(ip) if ip else {}
         hops.append(Hop(order=i, raw=str(header)[:300], ip=ip, geo=geo))
     return hops
 
 def offline_geoip(ip: str) -> dict[str, str]:
-    if ip in _OFFLINE_GEO:
-        return dict(_OFFLINE_GEO[ip])
-    if ip.startswith(("10.", "192.168.", "172.")):
-        return {"country": "PRIVATE", "city": "RFC1918", "org": "local"}
-    return {"country": "UNKNOWN", "city": "UNKNOWN", "org": "offline_db"}
+    return _offline_geo_for_ip(ip)
 
 def analyze_mbox(path: Path, limit: int = 50) -> list[EmailAnalysis]:
     results = []
@@ -77,12 +97,16 @@ header,section{background:#fffdf8;border:1px solid #e2ddcf;border-radius:10px;pa
 <footer class="muted">Generated locally by SignalTrace. Preserve the original .eml separately when evidentiary chain-of-custody matters.</footer></body></html>"""
 
 def hops_geojson_points(hops: list[Hop]) -> dict[str, Any]:
-    coords = {"US": [-122.08, 37.42], "AU": [151.2, -33.8], "PRIVATE": [0, 0], "UNKNOWN": [10, 10]}
+    # Only plot locations represented by an explicit offline lookup. Private/unknown IPs
+    # have no defensible coordinates, so they are omitted rather than placed at fake points.
+    coords = {"US": [-122.08, 37.42], "AU": [151.2, -33.8]}
     features = []
     for hop in hops:
         if not hop.ip:
             continue
         country = hop.geo.get("country", "UNKNOWN")
-        point = coords.get(country, [10, 10])
+        point = coords.get(country)
+        if point is None:
+            continue
         features.append({"type": "Feature", "geometry": {"type": "Point", "coordinates": point}, "properties": {"ip": hop.ip, "order": hop.order, **hop.geo}})
     return {"type": "FeatureCollection", "features": features}
