@@ -60,6 +60,8 @@ def analyze_message(raw: str, filename: str = "message.eml") -> dict[str, Any]:
         "spf": analysis.spf,
         "dkim": analysis.dkim,
         "dmarc": analysis.dmarc,
+        "authentication_claims_verified": False,
+        "authentication_claims_note": "SPF/DKIM/DMARC values are unverified supplied-header claims; SignalTrace does not validate the trusted receiving-server boundary.",
         "threat_score": score,
         "risk_band": band,
         "phishing_indicators": analysis.phishing_indicators,
