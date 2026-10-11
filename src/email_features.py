@@ -50,7 +50,13 @@ def trace_hops(raw: str) -> list[Hop]:
     hops = []
     # Received fields are prepended by relays; reverse them to show oldest-to-newest route order.
     for i, header in enumerate(reversed(received)):
-        ips = IP_RE.findall(header)
+        ips = []
+        for candidate in IP_RE.findall(str(header)):
+            try:
+                ipaddress.IPv4Address(candidate)
+            except ipaddress.AddressValueError:
+                continue
+            ips.append(candidate)
         ip = ips[0] if ips else None
         geo = _offline_geo_for_ip(ip) if ip else {}
         hops.append(Hop(order=i, raw=str(header)[:300], ip=ip, geo=geo))
