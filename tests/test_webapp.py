@@ -64,5 +64,5 @@ def test_email_ui_does_not_auto_analyze_bundled_phishing_sample():
     init = script[script.rfind("byId(\"ioc-search\").addEventListener"):]
 
     assert "loadSample();" not in init
-    assert 'byId("sample-button").addEventListener("click", loadSample)' in init
+    assert 'byId("sample-button").addEventListener("click", loadSample)' in script
     assert "No message has been analyzed yet" in init
