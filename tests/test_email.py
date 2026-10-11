@@ -178,3 +178,18 @@ def test_authentication_pass_header_is_disclosed_as_unverified_input():
 
     assert analysis.spf == analysis.dkim == analysis.dmarc == "pass"
     assert any("unverified claims" in anomaly for anomaly in analysis.anomalies)
+
+
+
+def test_untrusted_authentication_failure_headers_do_not_raise_numeric_score():
+    analysis = parse_email(
+        "From: sender@example.test\n"
+        "Authentication-Results: forged.example; spf=fail; dkim=fail; dmarc=fail\n"
+        "Subject: Routine update\n\n"
+        "The meeting starts at noon."
+    )
+
+    assert analysis.spf == analysis.dkim == analysis.dmarc == "fail"
+    assert analysis.threat_score == 0.0
+    assert any("unverified header claim" in signal for signal in analysis.phishing_indicators)
+    assert any("unverified claims" in item for item in analysis.anomalies)
