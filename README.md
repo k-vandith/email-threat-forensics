@@ -110,7 +110,7 @@ flowchart TD
 ## How to read the results
 
 - **SPF / DKIM / DMARC:** these are interpreted from the submitted message's authentication headers. Headers can be forged, absent, or produced by an unrelated hop. Unknown means the expected explicit result was not detected.
-- **Received hops:** displayed in header order as represented in the source email. They are useful leads, not proof of the full trusted mail route.
+- **Received hops:** displayed from the oldest captured hop (the bottom-most `Received` header) toward the newest hop. They are useful leads, not proof of the full trusted mail route.
 - **URLs and domains:** extracted as text for review. SignalTrace does not navigate to them, resolve redirects, or query reputation services.
 - **Indicator register:** deduplicated observed strings (IP-like values, URLs, and domains). Extraction alone does not establish that a value is malicious.
 - **Risk score:** a capped, explainable heuristic from selected indicators. It is not a probability that a message is phishing or a measure of financial or operational impact.
