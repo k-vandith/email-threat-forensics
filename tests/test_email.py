@@ -36,7 +36,8 @@ def test_conflicting_authentication_claims_never_resolve_to_pass():
     )
 
     assert analysis.spf == analysis.dkim == analysis.dmarc == "fail"
-    assert len(analysis.anomalies) == 3
+    assert len(analysis.anomalies) == 4
+    assert any("unverified claims" in anomaly for anomaly in analysis.anomalies)
 
 
 def test_extracts_bare_body_domains_all_ip_values_and_cleans_url_punctuation():
@@ -165,3 +166,15 @@ def test_hop_timeline_does_not_assign_geolocation_to_invalid_ip_text():
     assert len(hops) == 1
     assert hops[0].ip is None
     assert hops[0].geo == {}
+
+
+
+def test_authentication_pass_header_is_disclosed_as_unverified_input():
+    analysis = parse_email(
+        "From: sender@example.test\n"
+        "Authentication-Results: example.test; spf=pass; dkim=pass; dmarc=pass\n\n"
+        "Routine message."
+    )
+
+    assert analysis.spf == analysis.dkim == analysis.dmarc == "pass"
+    assert any("unverified claims" in anomaly for anomaly in analysis.anomalies)
