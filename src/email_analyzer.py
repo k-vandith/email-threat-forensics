@@ -27,9 +27,9 @@ class EmailAnalysis:
     anomalies: list[str] = field(default_factory=list)
 
 
-URL_RE = re.compile(r"https?://[^\\s<>\\"']+", re.I)
-IP_RE = re.compile(r"\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b")
-DOMAIN_RE = re.compile(r"\\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,}\\b", re.I)
+URL_RE = re.compile(r"""https?://[^\s<>"']+""", re.I)
+IP_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
+DOMAIN_RE = re.compile(r"\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}\b", re.I)
 SHORTENER_HOSTS = {"bit.ly", "tinyurl.com"}
 
 
@@ -56,9 +56,9 @@ def _extract_urls(text: str) -> list[str]:
 
 def _claim_status(method: str, auth_results: str, received_spf: str = "") -> str:
     """Interpret explicit header claims conservatively: any explicit fail wins."""
-    claims = re.findall(rf"\\b{re.escape(method)}\\s*=\\s*(pass|fail)\\b", auth_results, re.I)
+    claims = re.findall(rf"\b{re.escape(method)}\s*=\s*(pass|fail)\b", auth_results, re.I)
     if method.lower() == "spf":
-        claims.extend(re.findall(r"^\\s*(pass|fail)\\b", received_spf, re.I | re.M))
+        claims.extend(re.findall(r"^\s*(pass|fail)\b", received_spf, re.I | re.M))
     normalized = [claim.lower() for claim in claims]
     if "fail" in normalized:
         return "fail"
@@ -109,7 +109,7 @@ def parse_email(raw: str) -> EmailAnalysis:
                 content = content.decode(part.get_content_charset() or "utf-8", errors="replace")
             if isinstance(content, str):
                 body_parts.append(content)
-        body = "\\n".join(body_parts)
+        body = "\n".join(body_parts)
     else:
         try:
             content = msg.get_content()
@@ -117,7 +117,7 @@ def parse_email(raw: str) -> EmailAnalysis:
         except Exception:
             body = str(msg.get_payload())
 
-    full = raw + "\\n" + body
+    full = raw + "\n" + body
     analysis.urls = _extract_urls(full)
     analysis.domains = list(dict.fromkeys(DOMAIN_RE.findall(full)))
 
@@ -125,9 +125,9 @@ def parse_email(raw: str) -> EmailAnalysis:
     auth_results = " ".join(auth_values)
     received_spf = " ".join(str(value) for value in (msg.get_all("Received-SPF", []) or []))
     for method in ("spf", "dkim", "dmarc"):
-        statuses = re.findall(rf"\\b{method}\\s*=\\s*(pass|fail)\\b", auth_results, re.I)
+        statuses = re.findall(rf"\b{method}\s*=\s*(pass|fail)\b", auth_results, re.I)
         if method == "spf":
-            statuses.extend(re.findall(r"^\\s*(pass|fail)\\b", received_spf, re.I | re.M))
+            statuses.extend(re.findall(r"^\s*(pass|fail)\b", received_spf, re.I | re.M))
         normalized = [value.lower() for value in statuses]
         if "pass" in normalized and "fail" in normalized:
             analysis.anomalies.append(
