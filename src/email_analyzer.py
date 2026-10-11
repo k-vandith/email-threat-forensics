@@ -155,6 +155,10 @@ def parse_email(raw: str) -> EmailAnalysis:
     auth_values = [str(value) for value in (msg.get_all("Authentication-Results", []) or [])]
     auth_results = " ".join(auth_values)
     received_spf = [str(value) for value in (msg.get_all("Received-SPF", []) or [])]
+    if auth_values or received_spf:
+        analysis.anomalies.append(
+            "Email authentication headers are unverified claims until their trusted receiving-server boundary is confirmed."
+        )
     for method in ("spf", "dkim", "dmarc"):
         statuses = re.findall(rf"\b{method}\s*=\s*(pass|fail)\b", auth_results, re.I)
         if method == "spf":
